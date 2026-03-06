@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartoon Cargo Logistics 2D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Outfit:wght@400;900&display=swap");
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #38bdf8;
+        font-family: "Outfit", sans-serif;
+      }
+      canvas {
+        display: block;
+      }
+
+      .ui-layer {
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+      }
+      .interactive {
+        pointer-events: auto;
+      }
+
+      .cartoon-panel {
+        background: #ffffff;
+        border: 4px solid #000;
+        box-shadow: 8px 8px 0px #0ea5e9;
+        border-radius: 20px;
+      }
+
+      .cartoon-btn {
+        background: #2563eb;
+        border: 4px solid #000;
+        box-shadow: 0 4px 0 #1d4ed8, 0 4px 0 4px #000;
+        transition: all 0.1s;
+        transform: translateY(-4px);
+      }
+      .cartoon-btn:active {
+        transform: translateY(0px);
+        box-shadow: 0 0px 0 #1d4ed8, 0 0px 0 4px #000;
+      }
+      .cartoon-btn-red {
+        background: #ef4444;
+        box-shadow: 0 4px 0 #b91c1c, 0 4px 0 4px #000;
+      }
+      .cartoon-btn-green {
+        background: #22c55e;
+        box-shadow: 0 4px 0 #16a34a, 0 4px 0 4px #000;
+      }
+
+      .title-text {
+        font-family: "Luckiest Guy", cursive;
+        letter-spacing: 2px;
+        -webkit-text-stroke: 1px black;
+      }
+
+      .manifest-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .manifest-item {
+        background: #f8fafc;
+        border: 2px solid #000;
+        padding: 8px;
+        border-radius: 12px;
+      }
+
+      .cargo-count-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f1f5f9;
+        border: 2px solid #000;
+        padding: 8px;
+        border-radius: 15px;
+        margin-bottom: 8px;
+      }
+
+      #speedStreaks {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0;
+        transition: opacity 0.5s;
+      }
+      .streak {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.6);
+        height: 4px;
+        border-radius: 2px;
+        animation: flyBy linear infinite;
+      }
+      @keyframes flyBy {
+        from {
+          transform: translateX(110vw);
+        }
+        to {
+          transform: translateX(-10vw);
+        }
+      }
+
+      .flight-row {
+        border: 2px solid #000;
+        background: #fff;
+        margin-bottom: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      .flight-row:hover {
+        transform: scale(1.02);
+        background: #eff6ff;
+      }
+
+      .shipping-label {
+        background: #fff;
+        border: 2px dashed #000;
+        padding: 15px;
+        margin-top: 15px;
+        font-family: "monospace";
+        font-size: 11px;
+        color: #000;
+      }
+
+      .barcode {
+        height: 30px;
+        background: repeating-linear-gradient(
+          90deg,
+          #000,
+          #000 2px,
+          #fff 2px,
+          #fff 4px
+        );
+        width: 100%;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="speedStreaks"></div>
+
+    <div class="ui-layer flex flex-col p-6 h-full">
+      <!-- Dashboard View -->
+      <div id="dashboardView" class="flex justify-between items-start gap-4">
+        <div class="flex flex-col gap-4">
+          <div class="cartoon-panel p-6 w-80 interactive">
+            <h1
+              class="text-3xl title-text text-blue-600 uppercase leading-none mb-1"
+            >
+              CARGO DASH!
+            </h1>
+            <p
+              class="text-black text-[10px] font-black uppercase tracking-widest mb-4"
+            >
+              Tactile Logistics 6.0
+            </p>
+            <div class="space-y-2 text-black">
+              <div
+                class="bg-blue-50 border-2 border-black p-2 rounded-xl flex justify-between items-center"
+              >
+                <span class="text-[10px] font-black uppercase">Weight:</span>
+                <span id="weightVal" class="text-lg font-black font-mono"
+                  >42,000 kg</span
+                >
+              </div>
+              <div
+                id="fuelCard"
+                class="bg-yellow-50 border-2 border-black p-2 rounded-xl flex justify-between items-center transition-colors"
+              >
+                <span class="text-[10px] font-black uppercase">Fuel Burn:</span>
+                <span
+                  id="fuelVal"
+                  class="text-lg font-black font-mono text-yellow-700"
+                  >1.8 t/h</span
+                >
+              </div>
+              <div
+                id="priorityTag"
+                class="text-center text-[9px] font-black py-2 rounded-xl bg-blue-100 text-blue-800 uppercase border-2 border-black"
+              >
+                STANDARD PRIORITY
+              </div>
+            </div>
+          </div>
+
+          <div class="cartoon-panel p-5 w-80 interactive">
+            <h2
+              class="text-sm font-black uppercase italic mb-3 border-b-2 border-black pb-1"
+            >
+              Flight Manifest
+            </h2>
+            <div class="manifest-grid text-[10px] font-bold uppercase">
+              <div class="manifest-item">
+                <div class="text-slate-400 text-[8px]">Max Distance</div>
+                <div id="distVal" class="text-blue-600 font-black">--</div>
+              </div>
+              <div class="manifest-item">
+                <div class="text-slate-400 text-[8px]">Cruise Speed</div>
+                <div id="speedVal" class="text-blue-600 font-black">--</div>
+              </div>
+              <div class="manifest-item col-span-2">
+                <div class="text-slate-400 text-[8px]">Current Date</div>
+                <div id="currentDate" class="text-black font-black text-xs">
+                  Mar 06, 2026
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cartoon-panel p-6 w-72 interactive">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-black font-black uppercase italic text-sm">
+              Pallet Configuration
+            </h2>
+            <div
+              id="statusDot"
+              class="w-3 h-3 rounded-full bg-green-500 border-2 border-black"
+            ></div>
+          </div>
+          <div class="cargo-count-row">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">📦</span>
+              <div>
+                <div class="text-[8px] font-black uppercase text-slate-500">
+                  General
+                </div>
+                <div id="genCount" class="text-lg font-black leading-none">
+                  0
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <button
+                onclick="changeCargo('gen', -1)"
+                class="w-8 h-8 bg-white border-2 border-black rounded-lg font-black hover:bg-slate-200"
+              >
+                -
+              </button>
+              <button
+                onclick="changeCargo('gen', 1)"
+                class="w-8 h-8 bg-white border-2 border-black rounded-lg font-black hover:bg-blue-200"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div class="cargo-count-row">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">❄️</span>
+              <div>
+                <div class="text-[8px] font-black uppercase text-slate-500">
+                  Frozen
+                </div>
+                <div id="frozCount" class="text-lg font-black leading-none">
+                  0
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <button
+                onclick="changeCargo('froz', -1)"
+                class="w-8 h-8 bg-white border-2 border-black rounded-lg font-black hover:bg-slate-200"
+              >
+                -
+              </button>
+              <button
+                onclick="changeCargo('froz', 1)"
+                class="w-8 h-8 bg-white border-2 border-black rounded-lg font-black hover:bg-blue-200"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div
+            class="mt-4 bg-slate-800 text-white text-[9px] p-2 rounded-lg font-bold uppercase text-center"
+          >
+            Total: <span id="totalCount">0</span> / 8 Items
+          </div>
+        </div>
+      </div>
+
+      <!-- Planning View -->
+      <div
+        id="planningView"
+        class="hidden fixed inset-0 flex items-center justify-center p-10 interactive bg-black/20 backdrop-blur-sm"
+      >
+        <div id="routePanel" class="cartoon-panel w-full max-w-2xl p-8">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl title-text text-blue-600">ROUTE SELECTION</h2>
+            <button
+              onclick="closePlanning()"
+              class="text-black font-black text-xl hover:text-red-600"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6 mb-8">
+            <div>
+              <label class="block text-[10px] font-black uppercase mb-1"
+                >Origin Port</label
+              >
+              <select
+                id="originSelect"
+                class="w-full p-3 border-4 border-black rounded-xl font-bold bg-white"
+              >
+                <option value="New York (JFK)">New York (JFK)</option>
+                <option value="London (LHR)">London (LHR)</option>
+                <option value="Tokyo (HND)">Tokyo (HND)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black uppercase mb-1"
+                >Destination Port</label
+              >
+              <select
+                id="destSelect"
+                class="w-full p-3 border-4 border-black rounded-xl font-bold bg-white"
+              >
+                <option value="Dubai (DXB)">Dubai (DXB)</option>
+                <option value="Singapore (SIN)">Singapore (SIN)</option>
+                <option value="Paris (CDG)">Paris (CDG)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-2 flex justify-between items-end">
+            <span class="text-[10px] font-black uppercase"
+              >Available Flights -
+              <span id="flightDateDisplay">Mar 06</span></span
+            >
+            <span class="text-[10px] font-black text-slate-500 uppercase"
+              >Weight: <span id="weightCheck">42k</span> kg</span
+            >
+          </div>
+
+          <div id="flightList" class="h-64 overflow-y-auto pr-2 space-y-2">
+            <!-- Flights generated here -->
+          </div>
+
+          <div class="mt-8 flex gap-4 justify-end">
+            <button
+              onclick="closePlanning()"
+              class="cartoon-btn-red text-white font-black px-6 py-3 rounded-xl uppercase"
+            >
+              Cancel
+            </button>
+            <button
+              id="confirmCargoBtn"
+              onclick="showSummary()"
+              class="cartoon-btn-green text-white font-black px-8 py-3 rounded-xl uppercase"
+            >
+              Confirm Cargo
+            </button>
+          </div>
+        </div>
+
+        <!-- Shipping Summary Card (Hidden until confirm) -->
+        <div
+          id="summaryPanel"
+          class="hidden cartoon-panel w-full max-w-md p-8 relative"
+        >
+          <div
+            class="absolute -top-4 -right-4 bg-yellow-400 border-4 border-black p-2 rotate-12 title-text text-xs"
+          >
+            OFFICIAL COPY
+          </div>
+
+          <h2
+            class="text-2xl title-text text-black mb-4 border-b-4 border-black pb-2"
+          >
+            SHIPPING SUMMARY
+          </h2>
+
+          <div class="space-y-4">
+            <div class="flex justify-between border-b border-black/10 pb-1">
+              <span class="text-[10px] font-black uppercase text-slate-500"
+                >Flight ID:</span
+              >
+              <span id="sumFlightCode" class="font-bold text-blue-600"
+                >---</span
+              >
+            </div>
+            <div class="flex justify-between border-b border-black/10 pb-1">
+              <span class="text-[10px] font-black uppercase text-slate-500"
+                >Route:</span
+              >
+              <span id="sumRoute" class="font-bold">---</span>
+            </div>
+            <div class="flex justify-between border-b border-black/10 pb-1">
+              <span class="text-[10px] font-black uppercase text-slate-500"
+                >Total Mass:</span
+              >
+              <span id="sumWeight" class="font-bold">---</span>
+            </div>
+            <div class="flex justify-between border-b border-black/10 pb-1">
+              <span class="text-[10px] font-black uppercase text-slate-500"
+                >Handling:</span
+              >
+              <span id="sumHandling" class="font-bold text-orange-600"
+                >---</span
+              >
+            </div>
+          </div>
+
+          <div class="shipping-label mt-6">
+            <div class="flex justify-between font-bold mb-2">
+              <span>AWB# 744-8921-00</span>
+              <span>06 MAR 26</span>
+            </div>
+            <p>SHIPPER: CARGO DASH LOGISTICS CO.</p>
+            <p>CONTENTS: <span id="sumContents">0 GEN / 0 FROZ</span></p>
+            <p class="mt-2 text-[9px] leading-tight">
+              Notice: Carrier liability is limited. Temperature sensitive items
+              must be stored in Bay 01. High-speed jet mode engaged for priority
+              frozen cargo.
+            </p>
+            <div class="barcode"></div>
+          </div>
+
+          <div class="mt-8 flex gap-4">
+            <button
+              onclick="hideSummary()"
+              class="flex-1 cartoon-btn interactive bg-slate-200 text-black font-black py-3 rounded-xl uppercase border-4 border-black"
+            >
+              Back
+            </button>
+            <button
+              onclick="finalTakeoff()"
+              class="flex-1 cartoon-btn-green text-white font-black py-3 rounded-xl uppercase"
+            >
+              Approve & Fly
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="footerControls" class="mt-auto flex justify-center mb-10 gap-4">
+        <button
+          id="mainActionBtn"
+          onclick="toggleLoadingProcess()"
+          class="cartoon-btn interactive px-16 py-6 rounded-2xl text-white text-2xl title-text uppercase"
+        >
+          LOAD THE PLANE!
+        </button>
+
+        <div id="confirmGroup" class="hidden flex gap-4">
+          <button
+            onclick="cancelAction()"
+            class="cartoon-btn-red interactive px-10 py-6 rounded-2xl text-white text-2xl title-text uppercase"
+          >
+            CANCEL
+          </button>
+          <button
+            onclick="submitAction()"
+            class="cartoon-btn-green interactive px-10 py-6 rounded-2xl text-white text-2xl title-text uppercase"
+          >
+            SUBMIT
+          </button>
+        </div>
+      </div>
+
+      <div class="absolute bottom-6 left-10 flex gap-10">
+        <div class="text-black font-black text-xs uppercase italic">
+          BAY:
+          <span id="bayStatus" class="text-blue-700 underline">LOCKED</span>
+        </div>
+        <div class="text-black font-black text-xs uppercase italic">
+          Selected:
+          <span id="selectedFlightCode" class="text-blue-600">NONE</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="container"></div>
+
+    <script>
+      let scene,
+        camera,
+        renderer,
+        airplane,
+        topDoor,
+        activePalletGroup,
+        staticPalletGroup;
+      let isOpen = false,
+        isLoaded = false;
+      let targetDoorRotation = 0;
+      let selectedFlight = null;
+
+      let targetActiveCargoPos = { y: -0.65, z: 12 };
+      let targetStaticCargoPos = { y: -0.5, z: -1.5 };
+
+      let genCount = 0;
+      let frozCount = 0;
+      let currentWeight = 42000;
+
+      let currentWeightCompression = 0;
+      let jetModeFactor = 0;
+
+      const FULL_LOAD_COUNT = 8;
+      const BASE_WEIGHT = 42000;
+      const CRATE_WEIGHT = 2500;
+      const FUEL_BASE_BURN = 1.8;
+      const BASE_DISTANCE = 8500;
+      const BASE_SPEED = 900;
+
+      function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color('black');
+
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 11;
+        camera = new THREE.OrthographicCamera(
+          -d * aspect,
+          d * aspect,
+          d,
+          -d,
+          1,
+          1000
+        );
+        camera.position.set(20, 15, 20);
+        camera.lookAt(0, 0, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById("container").appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        airplane = new THREE.Group();
+        airplane.position.set(0, 1, 0);
+        scene.add(airplane);
+
+        const planeMat = new THREE.MeshToonMaterial({ color: 0xffffff });
+        const wingMat = new THREE.MeshToonMaterial({ color: 0xe2e8f0 });
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+
+        function createOutlinedMesh(geo, mat) {
+          const mesh = new THREE.Mesh(geo, mat);
+          const edges = new THREE.EdgesGeometry(geo);
+          const line = new THREE.LineSegments(edges, lineMat);
+          mesh.add(line);
+          return mesh;
+        }
+
+        const bodyGeo = new THREE.CylinderGeometry(
+          1.5,
+          1.5,
+          9,
+          32,
+          1,
+          false,
+          Math.PI,
+          Math.PI
+        );
+        const mainBody = createOutlinedMesh(bodyGeo, planeMat);
+        mainBody.rotation.z = Math.PI / 2;
+        airplane.add(mainBody);
+
+        topDoor = new THREE.Group();
+        const doorGeo = new THREE.CylinderGeometry(
+          1.5,
+          1.5,
+          9,
+          32,
+          1,
+          false,
+          0,
+          Math.PI
+        );
+        const topHull = createOutlinedMesh(doorGeo, planeMat);
+        topHull.rotation.z = Math.PI / 2;
+        topDoor.add(topHull);
+        airplane.add(topDoor);
+
+        const nose = createOutlinedMesh(
+          new THREE.SphereGeometry(1.5, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2),
+          planeMat
+        );
+        nose.position.x = 4.5;
+        nose.rotation.z = -Math.PI / 2;
+        airplane.add(nose);
+
+        const vTab = createOutlinedMesh(
+          new THREE.BoxGeometry(2.5, 3.5, 0.2),
+          planeMat
+        );
+        vTab.position.set(-4.5, 2.2, 0);
+        vTab.rotation.z = 0.4;
+        airplane.add(vTab);
+
+        const rightWing = createOutlinedMesh(
+          new THREE.BoxGeometry(3, 0.3, 10),
+          wingMat
+        );
+        rightWing.position.set(1, -0.2, 5.5);
+        airplane.add(rightWing);
+        const leftWing = rightWing.clone();
+        leftWing.position.z = -5.5;
+        airplane.add(leftWing);
+
+        staticPalletGroup = new THREE.Group();
+        staticPalletGroup.position.set(1, -0.5, 0);
+        airplane.add(staticPalletGroup);
+        createPalletVisuals(staticPalletGroup, 8, 0, 0x3b82f6);
+
+        activePalletGroup = new THREE.Group();
+        activePalletGroup.position.set(1, 0, 15);
+        scene.add(activePalletGroup);
+        updatePallet2Visuals();
+
+        const ground = createOutlinedMesh(
+          new THREE.PlaneGeometry(200, 200),
+          new THREE.MeshToonMaterial({ color: 0x0ea5e9 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -8;
+        scene.add(ground);
+
+        const streakContainer = document.getElementById("speedStreaks");
+        for (let i = 0; i < 15; i++) {
+          const s = document.createElement("div");
+          s.className = "streak";
+          s.style.top = Math.random() * 100 + "vh";
+          s.style.width = 50 + Math.random() * 150 + "px";
+          s.style.animationDuration = 0.3 + Math.random() * 0.4 + "s";
+          streakContainer.appendChild(s);
+        }
+
+        window.addEventListener("resize", onWindowResize);
+        generateFlights();
+        animate();
+        updateTelemetry();
+      }
+
+      function changeCargo(type, delta) {
+        if (type === "gen") {
+          if (genCount + frozCount + delta <= 8 && genCount + delta >= 0)
+            genCount += delta;
+        } else {
+          if (genCount + frozCount + delta <= 8 && frozCount + delta >= 0)
+            frozCount += delta;
+        }
+        document.getElementById("genCount").innerText = genCount;
+        document.getElementById("frozCount").innerText = frozCount;
+        document.getElementById("totalCount").innerText = genCount + frozCount;
+        updatePallet2Visuals();
+        updateTelemetry();
+      }
+
+      function updateTelemetry() {
+        const totalCrates = FULL_LOAD_COUNT + genCount + frozCount;
+        currentWeight = BASE_WEIGHT + totalCrates * CRATE_WEIGHT;
+        const weightFactor = (currentWeight - BASE_WEIGHT) / 50000;
+        const fuelBurn = FUEL_BASE_BURN + totalCrates * 0.25;
+        const distance = Math.max(2000, BASE_DISTANCE - weightFactor * 12000);
+        let speed = Math.max(450, BASE_SPEED - weightFactor * 1000);
+        if (frozCount > 0) speed += frozCount * 25;
+
+        document.getElementById("weightVal").innerText =
+          currentWeight.toLocaleString() + " kg";
+        document.getElementById("fuelVal").innerText =
+          fuelBurn.toFixed(1) + " t/h";
+        document.getElementById("distVal").innerText =
+          Math.round(distance).toLocaleString() + " km";
+        document.getElementById("speedVal").innerText =
+          Math.round(speed) + " km/h";
+
+        const streaks = document.getElementById("speedStreaks");
+        if (frozCount >= 5) {
+          document.getElementById("priorityTag").innerText =
+            "🚀 SONIC FROZEN JET MODE";
+          streaks.style.opacity = "1";
+        } else if (frozCount > 0) {
+          document.getElementById("priorityTag").innerText =
+            "❄️ PRIORITY HANDLING";
+          streaks.style.opacity = "0.3";
+        } else {
+          document.getElementById("priorityTag").innerText =
+            "STANDARD PRIORITY";
+          streaks.style.opacity = "0";
+        }
+      }
+
+      function toggleLoadingProcess() {
+        document.getElementById("mainActionBtn").classList.add("hidden");
+        document.getElementById("confirmGroup").classList.remove("hidden");
+        isOpen = true;
+        targetDoorRotation = -Math.PI * 0.7;
+        document.getElementById("bayStatus").innerText = "WIDE OPEN";
+        setTimeout(() => {
+          isLoaded = true;
+          targetStaticCargoPos = { y: -0.5, z: -2.5 };
+          targetActiveCargoPos = { y: 0.5, z: 0 };
+        }, 500);
+      }
+
+      function cancelAction() {
+        isLoaded = false;
+        targetStaticCargoPos = { y: -0.5, z: 0 };
+        targetActiveCargoPos = { y: 0, z: 15 };
+        setTimeout(() => {
+          isOpen = false;
+          targetDoorRotation = 0;
+          document.getElementById("bayStatus").innerText = "LOCKED";
+          document.getElementById("mainActionBtn").classList.remove("hidden");
+          document.getElementById("confirmGroup").classList.add("hidden");
+        }, 500);
+      }
+
+      function submitAction() {
+        document.getElementById("planningView").classList.remove("hidden");
+        document.getElementById("weightCheck").innerText =
+          (currentWeight / 1000).toFixed(1) + "k";
+        generateFlights();
+      }
+
+      function closePlanning() {
+        document.getElementById("planningView").classList.add("hidden");
+        hideSummary();
+      }
+
+      function generateFlights() {
+        const list = document.getElementById("flightList");
+        list.innerHTML = "";
+        for (let i = 0; i < 6; i++) {
+          const code = "CA" + Math.floor(100 + Math.random() * 800);
+          const stops = Math.floor(Math.random() * 2);
+          const row = document.createElement("div");
+          row.className = "flight-row";
+          row.onclick = () => selectFlight(code, stops);
+          row.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="font-black text-blue-600">${code}</span>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">${
+                          stops === 0 ? "NON-STOP" : stops + " STOP(S)"
+                        }</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="font-black">${4 + i}h 15m</span>
+                        <div class="text-[9px] font-black bg-blue-100 px-2 rounded-full uppercase">CARGO-JET</div>
+                    </div>
+                `;
+          list.appendChild(row);
+        }
+      }
+
+      function selectFlight(code, stops) {
+        selectedFlight = { code, stops };
+        document
+          .querySelectorAll(".flight-row")
+          .forEach((r) => (r.style.borderColor = "#000"));
+        event.currentTarget.style.borderColor = "#22c55e";
+        document.getElementById("selectedFlightCode").innerText = code;
+      }
+
+      function showSummary() {
+        if (!selectedFlight) return;
+        document.getElementById("routePanel").classList.add("hidden");
+        document.getElementById("summaryPanel").classList.remove("hidden");
+
+        document.getElementById("sumFlightCode").innerText =
+          selectedFlight.code;
+        document.getElementById("sumRoute").innerText = `${
+          document.getElementById("originSelect").value
+        } ➔ ${document.getElementById("destSelect").value}`;
+        document.getElementById("sumWeight").innerText =
+          currentWeight.toLocaleString() + " KG";
+        document.getElementById("sumHandling").innerText =
+          frozCount > 0 ? "❄️ CRYOGENIC / PRIORITY" : "📦 STANDARD BOXED";
+        document.getElementById(
+          "sumContents"
+        ).innerText = `${genCount} GENERAL / ${frozCount} FROZEN`;
+      }
+
+      function hideSummary() {
+        document.getElementById("routePanel").classList.remove("hidden");
+        document.getElementById("summaryPanel").classList.add("hidden");
+      }
+
+      function finalTakeoff() {
+        closePlanning();
+        document.getElementById("confirmGroup").classList.add("hidden");
+        document.getElementById("mainActionBtn").classList.remove("hidden");
+        document.getElementById("mainActionBtn").innerText =
+          "CLEARED FOR TAKEOFF!";
+        document
+          .getElementById("mainActionBtn")
+          .classList.replace("cartoon-btn", "cartoon-btn-green");
+      }
+
+      function createPalletVisuals(group, genItems, frozItems, staticCol) {
+        while (group.children.length > 0) group.remove(group.children[0]);
+        const palletGeo = new THREE.BoxGeometry(1.8, 0.3, 1.8);
+        const pallet = new THREE.Mesh(
+          palletGeo,
+          new THREE.MeshToonMaterial({ color: 0x000000 })
+        );
+        group.add(pallet);
+        const total = genItems + frozItems;
+        for (let i = 0; i < total; i++) {
+          const x = i % 2 === 0 ? -0.45 : 0.45;
+          const z = i < 2 || (i >= 4 && i < 6) ? -0.45 : 0.45;
+          const y = i >= 4 ? 0.9 : 0.5;
+          let color = i < frozItems ? 0x93c5fd : 0xf97316;
+          if (staticCol) color = staticCol;
+          const boxGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+          const crate = new THREE.Mesh(
+            boxGeo,
+            new THREE.MeshToonMaterial({ color: color })
+          );
+          crate.position.set(x, y, z);
+          group.add(crate);
+        }
+      }
+
+      function updatePallet2Visuals() {
+        createPalletVisuals(activePalletGroup, genCount, frozCount);
+      }
+      function onWindowResize() {
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 11;
+        camera.left = -d * aspect;
+        camera.right = d * aspect;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const time = Date.now() * 0.002;
+        topDoor.rotation.x += (targetDoorRotation - topDoor.rotation.x) * 0.1;
+        activePalletGroup.position.z +=
+          (targetActiveCargoPos.z - activePalletGroup.position.z) * 0.05;
+        activePalletGroup.position.y +=
+          (targetActiveCargoPos.y - activePalletGroup.position.y) * 0.05;
+        staticPalletGroup.position.z +=
+          (targetStaticCargoPos.z - staticPalletGroup.position.z) * 0.05;
+        const targetCompression =
+          activePalletGroup.position.z < 3 && genCount + frozCount > 0
+            ? ((genCount + frozCount) / 8) * 0.8
+            : 0;
+        currentWeightCompression +=
+          (targetCompression - currentWeightCompression) * 0.08;
+        jetModeFactor += (frozCount / 8 - jetModeFactor) * 0.05;
+        airplane.position.y =
+          1 + Math.sin(time) * 0.2 - currentWeightCompression;
+        if (jetModeFactor > 0.01) {
+          airplane.position.z = Math.sin(time * 50) * 0.02 * jetModeFactor;
+          airplane.rotation.z =
+            Math.sin(time * 1.2) * 0.02 - 0.05 * jetModeFactor;
+        } else {
+          airplane.rotation.z = Math.sin(time * 0.5) * 0.03;
+        }
+        renderer.render(scene, camera);
+      }
+      window.onload = init;
+    </script>
+  </body>
+</html>
